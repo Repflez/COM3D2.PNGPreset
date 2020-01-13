@@ -18,7 +18,9 @@ namespace COM3D2.PNGPreset.Managed
 
         private static readonly UnityDragAndDropHook dragAndDropHook = new UnityDragAndDropHook();
 
+        // Define the path for both preset and both layers
         private static readonly string PresetPath = Path.Combine(UTY.gameProjectPath, "Preset");
+        private static readonly string LayerPath = Path.Combine(UTY.gameProjectPath, "PluginData\\PNGPreset");
 
         private static ThumShot ThumShot => GameMain.Instance.ThumCamera.GetComponent<ThumShot>();
 
@@ -195,7 +197,15 @@ namespace COM3D2.PNGPreset.Managed
             using (var bw = new BinaryWriter(File.Create(Path.Combine(PresetPath,
                 $"pre_{maid.status.lastName}{maid.status.firstName}_{DateTime.Now:yyyyMMddHHmmss}.png"))))
             {
-                bw.Write(bigThumTex.EncodeToPNG());
+                // Load our layers and combine them
+                // Janky AF, but it works, so /shrug
+                Texture2D composedImagePreset;
+                var backgroundLayer = LoadPNG(Path.Combine(LayerPath, "background.png"));
+                composedImagePreset = CombineTextures(backgroundLayer, bigThumTex);
+                var foregroundLayer = LoadPNG(Path.Combine(LayerPath, "foreground.png"));
+                composedImagePreset = CombineTextures(composedImagePreset, foregroundLayer);
+
+                bw.Write(composedImagePreset.EncodeToPNG());
                 bw.Write(mgr.PresetSaveNotWriteFile(maid, presetType));
 
                 var exData = ExtPresetSupport.SaveExPresetData(maid);
@@ -213,6 +223,46 @@ namespace COM3D2.PNGPreset.Managed
                 SystemDialog.TYPE.OK);
 
             return true;
+        }
+
+        // http://answers.unity.com/answers/802424/view.html
+        private static Texture2D LoadPNG(string filePath)
+        {
+            Texture2D tex = null;
+            byte[] fileData;
+
+            if (File.Exists(filePath))
+            {
+                fileData = File.ReadAllBytes(filePath);
+                tex = new Texture2D(300, 400, TextureFormat.ARGB32, false);
+                tex.LoadImage(fileData);
+            }
+
+            return tex;
+        }
+
+        // https://stackoverflow.com/a/30833614
+        // Edited a bit to not start from bottom right
+        private static Texture2D CombineTextures(Texture2D baseLayer, Texture2D toCombine)
+        {
+            int startX = 0;
+            int startY = 0;
+
+            for (int x = startX; x < baseLayer.width; x++)
+            {
+                for (int y = startY; y < baseLayer.height; y++)
+                {
+                    Color bgColor = baseLayer.GetPixel(x, y);
+                    Color wmColor = toCombine.GetPixel(x - startX, y - startY);
+
+                    Color final_color = Color.Lerp(bgColor, wmColor, wmColor.a / 1.0f);
+
+                    baseLayer.SetPixel(x, y, final_color);
+                }
+            }
+
+            baseLayer.Apply();
+            return baseLayer;
         }
     }
 }

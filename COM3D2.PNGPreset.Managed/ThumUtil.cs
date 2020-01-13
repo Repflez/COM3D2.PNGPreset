@@ -39,7 +39,7 @@ namespace COM3D2.PNGPreset.Managed
 
             MoveTargetCard(thum, maid);
             camera.fieldOfView = 30f;
-            return thum.RenderThum(camera, thumCard1, thumCard2, CardSize, true);
+            return thum.RenderThum(camera, thumCard1, thumCard2, CardSize);
         }
     }
 }
